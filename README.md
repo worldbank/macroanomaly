@@ -61,7 +61,7 @@ The package follows a simple three-step pipeline:
 2.  **detect()** - Identify anomalies using one or multiple detection
     methods. We can detect anomalies using multiple methods
     simultaneously.
-3.  **report()** – Use plot or summary commands
+3.  **report** – Use plot or summary commands
 
 ## Example
 
