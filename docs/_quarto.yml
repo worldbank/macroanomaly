@@ -4,7 +4,7 @@ project:
 
 book:
   title: "Using the macroanomaly R Package and an AI-Enabled Anomaly Classifier"
-  subtitle: "DRAFT — Version 0.0.5"
+  subtitle: "Version 1.0.0"
   author: "World Bank Group — Office of the Chief Statistician and Development Data Group"
   date: "2026-06-26"
   output-file: manual
