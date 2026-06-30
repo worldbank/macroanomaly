@@ -1,0 +1,38 @@
+# Scope and Objective
+
+This document presents a practical set of statistical and machine
+learning methods for automated, unsupervised detection of both point and
+collective anomalies in time series. The methods are designed with
+development statistics in mind: series in this domain are often short,
+may exhibit trends and seasonality, and frequently contain gaps. A
+deliberate design goal is that these methods can be applied without
+country-specific or subject matter expertise, making them suitable for
+systematic, large-scale quality screening.
+
+The document does not cover rule-based checks or indicator-specific
+consistency tests --- such as range checks, accounting identities, or
+cross-series plausibility checks. These are valuable and complementary
+tools for quality control, and data producers are strongly encouraged to
+implement them. However, because they depend on domain-defined rules and
+expert judgment, they fall outside the scope of what this document
+addresses.
+
+Within these boundaries, the document pursues two practical objectives.
+The first is to demonstrate how to implement anomaly detection using
+macroanomaly, a dedicated R package (R Core Team 2025). The second is to
+show how detected anomalies can be classified as errors or legitimate
+outliers, and how explanations for those classifications can be
+generated using an AI-assisted workflow.
+
+Improving the accuracy, interpretability, and trustworthiness of time
+series data goes beyond internal quality-control procedures. It also
+requires a systematic feedback loop to data producers, and sustained
+collaboration with national statistical offices and other partner
+organizations. Because many World Bank series originate from external
+agencies, the quality of the Bank\'s data is ultimately inseparable from
+the quality of those upstream sources. The tools and methods described
+in this document are openly accessible to support this broader agenda:
+they can be used for internal quality screening, to inform corrections
+at the source, and to promote the wider adoption of sound anomaly
+detection practices across partner systems.
+

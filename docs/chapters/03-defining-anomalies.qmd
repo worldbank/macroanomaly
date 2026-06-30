@@ -1,0 +1,81 @@
+# Defining Anomalies in Time Series
+
+An anomaly in a time series is an observation --- or a short sequence of
+observations --- that departs markedly from what the series\' historical
+behavior would lead one to expect.
+
+**An anomaly is not an absolute property of a data point.** Whether an
+observation appears anomalous depends on the time span, comparability
+spell, and contextual information used in detection. An observation that
+appears unusual in a short window may appear consistent in a longer
+historical series. Users should also distinguish between temporary
+collective anomalies, which affect a short sequence of observations, and
+structural breaks, which reflect a more persistent change in level,
+trend, or data-generating process. This distinction matters because
+temporary anomalies may call for case review, while structural breaks
+may require a change in model, metadata, or interpretation rather than
+data correction.
+
+Anomalies can be categorized along two independent dimensions: whether
+they affect one or multiple observations (point vs. collective), and
+whether they are detected within a single series or across several
+(univariate vs. multivariate). Regardless of type, an anomaly may
+reflect either a genuine real-world event or a data quality problem.
+This distinction --- legitimate outlier versus error --- has direct
+implications for how the anomaly should be treated.
+
+**Point vs. collective anomalies**
+
+A point anomaly is a single observation that deviates sharply from the
+expected level, trend, or seasonal pattern. For example, the number of
+international air passengers dropped abruptly in 2020 --- a legitimate
+reflection of COVID-19 travel restrictions. By contrast, a life
+expectancy series showing a value of 805 years for a given country and
+year is almost certainly a data entry error, likely caused by a
+misplaced decimal point.
+
+A collective anomaly is a contiguous block of observations exhibiting a
+sustained and unusual change in pattern. For example, a government
+revenue series might show a persistent upward level shift beginning in
+2020 and continuing in subsequent years --- a pattern that could
+legitimately reflect a major tax reform rather than a data problem.
+
+**Univariate vs. multivariate anomalies**
+
+A univariate anomaly is one detected within a single indicator series,
+assessed on its own terms relative to its own history.
+
+A multivariate anomaly arises from an unusual combination of values or
+co-movements across indicators or geographies, even when each individual
+series appears unremarkable in isolation. For example, if a country\'s
+employment rate rises sharply while GDP contracts and electricity
+consumption remains flat in the same year, no single series may look
+anomalous on its own --- but the combination is internally inconsistent
+and warrants closer scrutiny.
+
+Multivariate methods are most useful when the main concern is not an
+isolated spike but an inconsistency across related variables. In this
+guide, 'multivariate' refers to methods that evaluate an observation
+using more than one feature, such as multiple indicators, lagged values,
+or derived contextual variables. A multivariate anomaly may arise when a
+value appears plausible on its own but implausible in context---for
+example, when poverty declines sharply during a period of economic
+contraction. In such cases, the flag should be interpreted as a signal
+of possible incoherence requiring review, not as proof of error.
+
+**Legitimate outliers vs. errors**
+
+Legitimate outliers are anomalies that reflect real events: economic
+shocks, natural disasters, policy changes, statistical
+reclassifications, series rebasings, or definitional revisions. Because
+they carry genuine information, legitimate outliers should be retained
+in the data. They should, however, be clearly explained and documented
+in metadata to support correct interpretation by users and analytical
+systems alike.
+
+Errors are anomalies caused by mistakes introduced at any stage of the
+data production process --- data entry, derivation, or modeling. Errors
+should be corrected wherever possible. When correction is not feasible,
+the affected values should be suppressed, with a clear justification
+recorded.
+

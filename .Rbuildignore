@@ -5,6 +5,7 @@
 ^\.github$
 ^LICENSE\.md$
 ^doc$
+^docs$
 ^Meta$
 ^\.positai$
 ^\.claude$

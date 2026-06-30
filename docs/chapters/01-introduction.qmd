@@ -1,0 +1,66 @@
+# Introduction
+
+National statistical organizations and international organizations
+compile and disseminate time series data on development indicators for
+use by policymakers, researchers, businesses, and the general public.
+Ensuring the quality of these series is essential for credible evidence
+and sound decision-making.
+
+Data quality encompasses several dimensions: relevance, accuracy,
+timeliness, comparability, coherence, accessibility, and
+interpretability. Quality assurance and quality control should be
+applied across the entire data lifecycle --- from design and collection
+through compilation, derivation, validation, documentation, and
+dissemination --- with appropriate metrics, assessment methods, and
+corrective actions at each stage.
+
+This document focuses on one specific aspect of data quality control:
+the detection of anomalies in time series, defined as observations ---
+or short sequences of observations --- that depart markedly from
+expectations. Before publishing time series, data producers and
+distributors should systematically screen for anomalies. Anomaly
+detection is a diagnostic input within a broader, human-governed data
+quality process. Its purpose is to identify observations that warrant
+review, not to determine automatically that a value is wrong or should
+be changed. An anomaly flag is therefore a trigger for review, not a
+correction decision. In practice, flagged observations may reflect data
+errors, real-world shocks, methodological changes, structural breaks, or
+temporary departures from historical patterns. Some cases may remain
+uncertain even after expert review. For this reason, anomaly detection
+should be implemented as part of a governed workflow that separates four
+steps: statistical screening, expert review, classification, and
+treatment through approved data revision procedures. The document covers
+how artificial intelligence (AI) can assist in classifying and resolving
+detected anomalies.
+
+Anomaly detection is primarily the responsibility of data curators and
+publishers. However, because it is not always performed consistently at
+the source, data analysts are also encouraged to apply these procedures
+before using time series in their own work.
+
+The document is organized as follows. Section 2 situates anomaly
+detection within the broader framework of data quality assurance.
+Section 3 defines \"anomaly\" in the context of time series and
+describes key distinctions --- point versus collective anomalies,
+univariate versus multivariate detection, and errors versus legitimate
+outliers. Section 4 sets out the scope and objectives of the document.
+Section 5 introduces the R package macroanomaly. Section 6 reviews
+selected anomaly detection methods. Section 7 explains how to apply
+these methods using macroanomaly, including dataset preparation and
+practical code examples. Section 8 presents an AI-assisted tool for
+classifying detected anomalies and generating explanations. Section 9
+offers recommendations for treating anomalies once identified.
+
+This guide presents a methodological framework, not a software
+requirement. Although examples may use the macroanomaly R package, the
+principles described here---preprocessing, threshold calibration,
+univariate and multivariate screening, expert review, and
+classification---can be implemented in any suitable statistical
+environment. Package-specific code should therefore be treated as
+illustrative rather than normative.
+
+This document was developed to support implementation of the World Bank
+Group Development Data Quality Policy. Its production was made possible
+in part by funding from a WBG Innovation Award (P514969 --- Leveraging
+MCP for Responsible AI).
+

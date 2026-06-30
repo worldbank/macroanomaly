@@ -1,0 +1,579 @@
+# Classifying and Explaining Anomalies Using AI
+
+Once the anomaly detection process has flagged a set of candidate
+observations, the next task is to determine what each one represents. An
+anomalous data point is not inherently wrong---it may be a genuine error
+that needs correction, or it may be a legitimate value that accurately
+reflects an unusual real-world event. The goal of the classification
+step is to make that determination efficiently and consistently, at a
+scale that would be impractical to achieve through manual investigation
+alone.
+
+This section describes how artificial intelligence can assist data
+curators in classifying and explaining flagged anomalies. It covers the
+role of Large Language Models (LLMs) in generating evidence-based
+explanations, the multi-model architecture used to reduce classification
+errors, the taxonomy of classification outcomes, and how validated
+AI-generated explanations can be repurposed as annotations that improve
+the interpretability of the data for end users. The tools developed for
+classification and explanation of anomalies are openly accessible on
+Github (see <https://github.com/worldbank/ai4data>).
+
+## From Detection to Classification
+
+Anomaly detection produces a list of flagged observations, but not all
+flags are equal. Depending on the models and thresholds applied, a
+portion of flagged values will be false positives---observations that
+appear statistically unusual but are in fact within normal variation, or
+whose deviation is not large enough to warrant concern. Before
+proceeding to classification, it is the data curator\'s responsibility
+to apply filters that reduce the review set to the cases most likely to
+require action.
+
+These filters can be applied along several dimensions:
+
+1.  The absolute z-score, or equivalent deviation measure, produced by
+    the detection step. Observations that deviate more strongly from
+    expected values are more likely to represent genuine anomalies and
+    should be prioritized.
+
+2.  The number of independent detection models that flagged the same
+    observation. Agreement across multiple methods provides stronger
+    evidence that something unusual is occurring, as opposed to an
+    artifact of a single algorithm\'s sensitivity.
+
+3.  Institutional relevance: indicators produced directly by the World
+    Bank may be prioritized over third-party indicators redistributed by
+    the Bank, where timely remediation has a direct operational and
+    reputational impact.
+
+4.  User impact: indicators with high query volume, recent reference
+    periods, or proximity to an upcoming publication cycle warrant
+    higher priority than older or less-used series.
+
+After filtering, the curated subset is passed to the classification
+step. Here, each anomaly must be assigned to one of two broad outcomes:
+it is either a genuine error that requires correction or removal, or it
+is a legitimate value that requires annotation. Making this
+determination accurately, at scale, is the central challenge that
+AI-assisted classification addresses.
+
+After review, each flagged observation should be assigned to one of the
+operational classification categories defined in Section 8.4. This
+classification records the most likely explanation for the anomaly based
+on the available evidence and should be maintained separately from any
+subsequent treatment decision. Although the taxonomy uses the label
+*insufficient data*, the intent is to indicate insufficient evidence to
+determine whether the flag reflects a data error, a legitimate signal,
+or a limitation of the available information.
+
++-----------------------------------------------------------------------+
+| Note on scope                                                         |
+|                                                                       |
+| The classification step described in this section operates on the     |
+| filtered output of anomaly detection. It is not a substitute for the  |
+| filtering step itself, nor for the governance processes that govern   |
+| treatment decisions described in Section 9.                           |
++=======================================================================+
+
+## The Role of AI in Anomaly Classification
+
+Manual classification of anomalies is a knowledge-intensive process. To
+determine whether a sharp drop in a country\'s income distribution
+indicator in a given year reflects a data error or a real economic
+event, a curator needs contextual knowledge spanning economic history,
+statistical methodology, and country-specific conditions, often across
+dozens of countries and indicators simultaneously. At scale, this is not
+feasible without assistance.
+
+Large Language Models are well-suited to this task because explaining a
+data anomaly is fundamentally a retrieval and reasoning problem. Given
+an unusual observation in a particular country at a particular time, the
+question is: what documented events or changes could account for it? The
+answer space is large and heterogeneous, ranging from economic crises,
+conflicts, natural disasters, policy changes, methodological revisions,
+to statistical rebasings, but it is also well-documented in the kind of
+text that LLMs are trained on.
+
+An LLM that has processed a broad corpus of economic history and
+statistical documentation is in a reasonable position to connect, for
+example, a spike in a poverty indicator in a country undergoing
+hyperinflation to a well-documented macroeconomic crisis, or to
+recognize that a step-change in national accounts data aligns with a
+rebasing exercise that preceded EU accession. These are not inferences
+that require deep statistical reasoning; instead, they require the kind
+of contextual knowledge that LLMs encode effectively. The proposed
+method elicits embedded knowledge from various LLMs.
+
+The AI is prompted to attempt an evidence-based explanation for each
+flagged observation. If it identifies a documented reason, a named
+event, a statistical revision, or a policy change with a clear date
+range, it classifies the anomaly as a likely legitimate value and
+provides a concise narrative. If it cannot find a credible explanation,
+it classifies the observation as a likely error. In cases where the
+evidence is ambiguous or insufficient to reach a confident conclusion,
+it records the case accordingly rather than forcing a classification.
+
++-----------------------------------------------------------------------+
+| Important                                                             |
+|                                                                       |
+| Treat AI-generated classifications as suggestions. They are designed  |
+| to prioritize and inform expert review. All treatment actions,        |
+| including corrections, removals, and annotations, require human       |
+| validation and appropriate approvals before being applied to the      |
+| database.                                                             |
++=======================================================================+
+
+## Multi-model Architecture
+
+A single LLM can be unreliable. It may hallucinate a plausible-sounding
+but fabricated explanation, miss relevant context, or produce
+overconfident assessments on ambiguous evidence. To reduce these risks,
+the pipeline uses a multi-model architecture in which two independent
+models evaluate each anomaly separately, and their outputs are then
+compared in a synthesis step.
+
+### Independent Evaluation
+
+Two language models evaluate each flagged anomaly independently,
+receiving identical prompts. Each prompt provides the model with the
+indicator name and code, the country or economy, the flagged time
+window, a trimmed excerpt of the surrounding time series including
+imputation flags, and an instruction to identify an evidence-based
+explanation if one exists.
+
+Each model returns a structured response containing: a classification
+from the controlled taxonomy described in Section 8.4, a free-text
+explanation of its reasoning, a confidence score between 0 and 1, and a
+list of evidence sources with names, date ranges, source type
+classifications, and verifiability assessments.
+
+The two models operate without knowledge of each other\'s outputs. This
+independence is deliberate. It prevents one model from anchoring on the
+other\'s framing, and it produces genuinely separate opinions that can
+be compared and contrasted. When both models reach the same conclusion
+independently, that agreement provides meaningful corroboration. When
+they diverge, the divergence is informative as it flags a case where the
+evidence is genuinely ambiguous.
+
+### Synthesis and Agreement
+
+After both models return their assessments, a synthesis step compares
+their classifications and records the outcome in an agreement field.
+Three states are possible:
+
+  -----------------------------------------------------------------------
+  Agreement     Meaning                  Implication for the curator
+  ------------- ------------------------ --------------------------------
+  Agree         Both models              Higher confidence in the
+                independently reached    consensus verdict. Either
+                the same classification. model\'s narrative can serve as
+                                         the basis for an annotation,
+                                         subject to expert review.
+
+  Disagree      The two models reached   The case requires closer curator
+                different                attention before any treatment
+                classifications.         is applied. Both narratives
+                                         should be reviewed alongside
+                                         primary source documentation. A
+                                         common pattern is one model
+                                         returning an external driver
+                                         classification and the other
+                                         returning insufficient data,
+                                         indicating that evidence exists
+                                         but is not conclusive.
+
+  Single        Only one model evaluated No cross-model validation is
+                this record.             available. Confidence relies
+                                         entirely on the single model\'s
+                                         output and should be interpreted
+                                         accordingly.
+  -----------------------------------------------------------------------
+
+The synthesis step also produces a consolidated confidence score,
+aggregating the per-model values, and an evidence strength assessment
+that characterizes the quality of the evidence cited. These two fields
+together provide a richer signal for prioritization than either the
+classification or the confidence score alone.
+
+### Structured Evidence Sourcing
+
+A key design requirement of the pipeline is that explanations must be
+evidence-based rather than inferential. Models are prompted to identify
+specific, documented events or changes, e.g., named crises, published
+revisions, policy announcements with date ranges, rather than offering
+generic macroeconomic reasoning. This serves two purposes: it makes
+explanations verifiable against primary sources, and it produces
+annotation text that is specific and credible.
+
+When a model cites evidence, it records the source using a controlled
+taxonomy of source types. The table below lists the full set of values
+used.
+
+**Controlled vocabulary for evidence source types used in AI-generated
+anomaly explanations**
+
+  -----------------------------------------------------------------------
+  Source type          Description
+  -------------------- --------------------------------------------------
+  Economic crisis      Recession, financial crisis, hyperinflation,
+                       currency collapse, or similar macroeconomic shock
+                       with a documented impact on the measured
+                       phenomenon.
+
+  Policy change        Government policy shift, structural reform,
+                       legislative change, or regulatory action with a
+                       direct effect on the indicator.
+
+  Conflict             Armed conflict, civil war, or political violence
+                       disrupting economic activity or data collection
+                       capacity.
+
+  Natural disaster     Earthquake, flood, drought, cyclone, or other
+                       natural event with measurable economic or social
+                       impact.
+
+  Global event         A worldwide event simultaneously affecting
+                       multiple countries, such as a global financial
+                       crisis or pandemic.
+
+  Regional event       An event primarily affecting a specific region or
+                       economic bloc, such as an EU accession wave or
+                       regional financial contagion.
+
+  Data revision        A formal revision to previously published data
+                       issued by the national statistics office or the
+                       World Bank.
+
+  Rebasing             A change in the base year or reference period used
+                       for national accounts or price indices.
+
+  Data error           A suspected transcription, processing, or
+                       aggregation error introduced during data handling.
+
+  Other                Evidence that does not fit the categories above.
+  -----------------------------------------------------------------------
+
+## Classification Taxonomy
+
+The pipeline assigns each anomaly one of four classification values.
+These are not just descriptive labels --- each maps directly to a
+different treatment path and carries specific implications for how the
+observation should be handled. The table below sets out the full
+taxonomy.
+
+**Anomaly classification taxonomy, with typical evidence strength and
+recommended treatment path**
+
+  ------------------------------------------------------------------------
+  Classification   Description          Typical      Treatment path
+                                        evidence     
+                                        strength     
+  ---------------- -------------------- ------------ ---------------------
+  External driver  A real-world event   Strong       Retain the value.
+                   such as economic     direct       Validate the cited
+                   crisis, conflict,                 explanation against
+                   natural disaster,                 source documentation.
+                   policy change,                    Use the narrative as
+                   global or regional                an annotation once
+                   shock, that                       validated by a
+                   plausibly explains                subject matter
+                   the observed                      expert.
+                   movement. The data                
+                   value is likely                   
+                   correct; the anomaly              
+                   reflects the world                
+                   rather than a                     
+                   problem with the                  
+                   data.                             
+
+  Measurement      The movement         Strong       Review methodology
+  system update    reflects a change in direct       documentation for the
+                   statistical                       period. Check for a
+                   methodology, survey               published
+                   design, national                  series-break note.
+                   accounts rebasing,                Annotate the affected
+                   or                                window accordingly.
+                   system-of-accounts                
+                   revision rather than              
+                   a real change in the              
+                   underlying                        
+                   phenomenon. The                   
+                   value may be correct              
+                   within a revised                  
+                   framework but                     
+                   represents a series               
+                   break.                            
+
+  Data error       The movement is      No evidence  Open a data-quality
+                   inconsistent with                 ticket. Cross-check
+                   plausible real-world              against primary
+                   variation and likely              source data and
+                   reflects a                        revision history.
+                   transcription error,              Consult the
+                   processing artifact,              originating data
+                   or implausible value              provider where the
+                   introduced during                 data originates from
+                   data handling.                    an external source.
+
+  Insufficient     Neither a real-world No evidence  Deprioritize unless
+  data             driver nor a data                 the magnitude is
+                   issue could be                    large or domain
+                   identified with                   knowledge points to a
+                   sufficient                        specific cause. Flag
+                   confidence. The                   for future review.
+                   observation is                    
+                   statistically                     
+                   unusual but                       
+                   unexplained.                      
+  ------------------------------------------------------------------------
+
+A companion field, **is_anomaly**, records whether the pipeline
+confirmed the flag as a genuine anomaly. Observations classified as
+insufficient data receive a value of false, indicating that the pipeline
+found nothing conclusive enough to confirm the detection, which is
+itself a signal to deprioritize the case rather than investigate
+further.
+
+### Evidence Strength
+
+Alongside the classification, the pipeline records the quality of
+evidence supporting it. This is an important secondary signal: a
+high-confidence external driver classification backed by strong direct
+evidence warrants different treatment from one backed only by weak or
+speculative context. Four levels are used.
+
+**Evidence strength levels used in anomaly explanation outputs**
+
+  -----------------------------------------------------------------------
+  Level               Description
+  ------------------- ---------------------------------------------------
+  Strong direct       Well-documented, directly relevant evidence exists
+                      such as a named event with a clear date range and
+                      an established record that directly connects to the
+                      indicator and country in question.
+
+  Moderate contextual Relevant context exists but does not conclusively
+                      explain the movement. Some inferential gap remains
+                      between the cited event and the specific
+                      observation.
+
+  Weak speculative    Evidence is present but highly speculative or
+                      tangential to the specific observation.
+
+  No evidence         No supporting evidence was identified. The
+                      classification is based on the shape of the series
+                      alone.
+  -----------------------------------------------------------------------
+
+## Using Explanations as Data Annotations
+
+The classification and confidence fields support internal triage. But
+the most durable output of the pipeline, the output that creates lasting
+value beyond the curation workflow, is the free-text explanation. For
+anomalies confirmed as legitimate outliers with documented causes, this
+narrative is the basis for an annotation that should accompany the data
+point wherever it is used: in databases, visualizations, APIs, and
+publications.
+
+Annotations matter because they change what the data communicates to its
+users. An unexplained spike in an income distribution indicator looks
+like a possible error. The same data point, annotated with a concise
+reference to the economic or political shock that caused it, becomes
+interpretable evidence. It tells users not only what happened but why,
+and it signals that the value has been reviewed and its provenance
+understood. This is especially important for development data, where
+anomalous observations in crisis periods or fragile states are often the
+most policy-relevant data points in an entire series.
+
+### What Makes a Good Annotation
+
+The pipeline is designed to produce annotation-ready text for external
+driver and measurement system update cases, subject to expert
+validation. Effective annotations share several characteristics:
+
+5.  **Specificity.** A reference to a named event with a date range is
+    more credible and verifiable than a generic statement about economic
+    instability. Where a model cites the 2008 Icelandic financial crisis
+    (September 2008 to December 2010), for example, the annotation can
+    be checked against the historical record and the causal link to the
+    income distribution indicator explained clearly.
+
+6.  **Relevance to the indicator.** A good annotation does not simply
+    note that an event occurred. It should explain the mechanism by
+    which the event would be expected to affect the specific indicator
+    being annotated. A financial crisis that erodes household incomes
+    across all quintiles affects an income share indicator differently
+    from one that concentrates losses at the top.
+
+7.  **Concision.** An annotation is not a literature review. Two to
+    three sentences that identify the cause and describe its effect on
+    the series are sufficient for most use cases.
+
+8.  **Verifiability.** Annotations derived from well-documented evidence
+    should be presented with greater confidence than those based on
+    partially documented or inferred connections. Where evidence is only
+    moderately documented, the annotation should reflect that
+    uncertainty.
+
+The following example illustrates what the pipeline produces for a
+well-documented external driver case:
+
+  -----------------------------------------------------------------------
+  Indicator             Income share held by second 20%
+  --------------------- -------------------------------------------------
+  Country               Iceland
+
+  Anomaly window        2008--2010
+
+  Classification        external_driver · both models agree · confidence:
+                        0.9 · evidence: strong_direct
+
+  Model A narrative     The sharp drop in 2008 followed by a rebound in
+                        2009--2010 aligns with the impact of the 2008
+                        Icelandic financial crisis, a well-documented
+                        economic shock affecting income distribution.
+
+  Model B narrative     The Icelandic financial crisis, which began in
+                        late 2008, caused severe economic disruption and
+                        likely impacted income distribution, leading to a
+                        fluctuation and subsequent increase in the income
+                        share held by the second 20% during this period.
+
+  Evidence cited        2008 Icelandic financial crisis · Sep 2008 -- Dec
+                        2010 · economic_crisis · well_documented
+  -----------------------------------------------------------------------
+
+And the following example shows a disagree case, where classification
+requires closer curator judgment before any annotation is applied:
+
+  -----------------------------------------------------------------------
+  Indicator             Income share held by second 20%
+  --------------------- -------------------------------------------------
+  Country               Slovak Republic
+
+  Anomaly window        2005--2006
+
+  Classification        disagree: Model A → external_driver (conf. 0.8) ·
+                        Model B → insufficient_data (conf. 0.5)
+
+  Model A narrative     The fluctuation may reflect structural economic
+                        changes following Slovakia's EU accession in
+                        2004, which triggered significant adjustments in
+                        income distribution.
+
+  Model B narrative     No specific, well-documented event or data
+                        revision could be identified to explain the
+                        observed fluctuations during this period.
+
+  Recommended action    Review both narratives against source
+                        documentation before accepting the EU accession
+                        explanation. Do not auto-populate an annotation
+                        until a curator has validated the causal link.
+  -----------------------------------------------------------------------
+
+### Selecting and Applying Annotation Text
+
+The pipeline produces candidate annotation text. The following guidance
+applies to translating pipeline outputs into annotations accepted for
+publication:
+
+9.  **When both models agree and evidence is strong:** Either model\'s
+    narrative can serve as the basis for the annotation, or a
+    synthesized version can be constructed. Expert review is still
+    required, but the bar for acceptance is lower when independent
+    models have converged on the same explanation from strong evidence.
+
+10. **When models disagree:** Do not auto-populate an annotation.
+    Require curator review of both narratives alongside primary sources.
+    If one model\'s explanation is accepted, the annotation should
+    reflect the level of confidence --- for example, noting that the
+    causal link is plausible but not definitively established.
+
+11. **When evidence strength is moderate or weak:** Apply additional
+    scrutiny. The model has identified a potential explanation but the
+    connection to the specific movement is inferential. Consider whether
+    a qualified annotation is more appropriate than a confident one, or
+    whether the case should be flagged as pending review.
+
+12. **For measurement system update cases:** The annotation should
+    reference the specific methodological change and, where possible,
+    link to the published documentation --- a rebasing note, a revision
+    circular, or a national statistics office bulletin.
+
+Once validated, annotations must be stored in the database and made
+available to end users through all channels: data tables,
+visualizations, and APIs. Annotations held only in internal curation
+systems provide no benefit to users and do not fulfil the goal of
+improving data interpretability.
+
+![- Anomaly classification
+reviewer](../images/media/image7.png){width="6.591882108486439in"
+height="4.544596456692913in"}
+
+## Limitations and Safeguards
+
+The AI-assisted classification pipeline is a tool for improving the
+efficiency and consistency of curation, not one that eliminates the need
+for human judgment. Understanding its limitations is as important as
+understanding its capabilities.
+
+### Known Limitations
+
+13. **Knowledge cutoffs.** LLMs have training data cutoffs and will not
+    be aware of events that occurred after their training was completed.
+    For near-real-time detection workflows, very recent events may be
+    misclassified as data errors or insufficient data. This limitation
+    may require augmenting the pipeline with retrieval from current news
+    sources or official statistical release calendars.
+
+14. **Hallucination risk.** Models can generate plausible-sounding but
+    fabricated explanations. A model may cite a real event that did not
+    in fact affect the specific country or indicator in question, or
+    connect a genuine event to a series movement through faulty
+    reasoning. The structured evidence sourcing requirement, which
+    compels models to name specific, verifiable events, reduces but does
+    not eliminate this risk.
+
+15. **Confidence calibration.** Confidence scores reflect the model\'s
+    internal self-assessment, not an externally calibrated probability.
+    A score of 0.9 should be read as a relative signal, i.e., higher
+    confidence cases are more likely to be reliable, rather than as a
+    statement that there is a 90 percent probability of correctness.
+
+16. **Geographic coverage.** Models tend to be better calibrated for
+    well-documented events in larger economies than for events in
+    smaller or lower-income countries where English-language
+    documentation is sparse. External driver explanations for anomalies
+    in these contexts should be treated with additional scrutiny.
+
+17. **Methodological changes.** Statistical rebasings, survey redesigns,
+    and system-of-accounts updates are documented in technical
+    publications that may not be well-represented in model training
+    data. The measurement system update classification should always be
+    verified against official methodology notes, regardless of model
+    confidence.
+
+### Built-in Safeguards
+
+Several design features of the pipeline are specifically intended to
+manage these limitations:
+
+18. Independent dual evaluation reduces the risk that a single model\'s
+    error goes undetected. When two models independently produce the
+    same explanation, the probability of a shared fabrication is
+    substantially lower than for a single-model output.
+
+19. Structured evidence sourcing makes explanations verifiable. A model
+    that must cite a named event with a date range is more constrained
+    than one that can offer free-form reasoning, and vague or
+    unverifiable explanations are easier to identify and reject.
+
+20. Explicit disagreement surfacing ensures that ambiguous cases reach
+    human attention rather than being silently resolved in favor of the
+    more confident model.
+
+21. The mandatory expert validation step before annotation acceptance
+    means that the pipeline\'s limitations affect the efficiency of
+    curation, not the quality of published annotations.
+

@@ -1,0 +1,575 @@
+# Detecting Anomalies in Practice
+
+## Operational Considerations
+
+The World Bank Group (WBG) curates databases spanning tens of thousands
+of indicators, produced by Bank units or sourced from a large number of
+external providers, and covering countries and territories worldwide.
+This translates to hundreds of thousands of individual time series, many
+of which are updated on a regular basis. At this scale, manual review is
+not feasible: anomaly detection must be as automated and systematic as
+possible, which is the primary motivation for providing an open-source,
+scriptable package that can be integrated into existing data pipelines.
+
+**Using multiple methods**
+
+Each detection method implemented in macroanomaly has its own strengths
+and blind spots --- no single method reliably identifies all anomaly
+types across all series. In practice, it is strongly recommended to
+apply several methods in combination. Each method produces a binary flag
+(anomaly or not), and some additionally provide a continuous measure of
+anomalousness, such as an absolute Z-score. Running multiple methods in
+parallel allows detections to be triangulated: an observation flagged by
+several methods independently warrants more attention than one flagged
+by only a single method.
+
+Prioritization is a practical necessity when detection yields a large
+number of flagged observations, as it frequently will at the scale of
+WBG databases. Useful criteria for prioritization include the number of
+methods that flagged a given observation, the magnitude of the anomaly
+score, the recency of the observation, the relative importance of the
+indicator or geography in question, and the reliability of the data
+source.
+
+**Feedback loops and upstream correction**
+
+The macroanomaly package is publicly available, and the methods and
+workflows described in this document are intentionally open and
+replicable. This reflects a broader principle: anomalies are ideally
+detected and treated at the source --- by national statistical offices,
+central banks, or regional and international organizations --- rather
+than corrected downstream by data distributors. When the World Bank
+detects a potential anomaly in a third-party dataset, the appropriate
+response is to establish a feedback loop with the originating
+institution rather than to apply unilateral corrections. The tools
+described here are designed to support that two-way exchange.
+
+**The iterative nature of anomaly detection**
+
+An important characteristic of anomaly detection that users should keep
+in mind is that it is inherently iterative and relative. If a detection
+script is run, some values are corrected, and the same script is then
+run again on the updated series, new anomalies will often surface ---
+because removing or correcting extreme values changes the mean, standard
+deviation, and other distributional properties of the series, shifting
+what counts as \"normal.\" This is expected behavior, not a flaw, but it
+means that anomaly detection should be treated as an ongoing process
+rather than a one-time procedure, and that each successive round of
+detection requires the same level of scrutiny as the first.
+
+**Human oversight is essential**
+
+macroanomaly is a decision-support tool, not a decision-making system.
+Detected anomalies must be reviewed, classified, and assessed by
+qualified experts --- potentially with the assistance of AI tools such
+as those described in Section 8 --- before any action is taken. Under no
+circumstances should flagged values be corrected automatically based on
+detection outputs alone. All changes to published data must involve
+human judgment and follow established quality control and governance
+procedures. The role of the package is to surface candidates for review
+efficiently; the responsibility for what happens next rests with the
+people using it.
+
+## Data Preparation
+
+Before anomaly detection can be run, the input data must meet three
+requirements: it must be structured in long format, it must contain no
+missing values, and it must be normalized. The following subsections
+explain how to prepare a dataset that satisfies these requirements.
+
+### Formatting the Dataset
+
+A single input dataset passed to macroanomaly may contain multiple
+indicators and multiple geographies. However, all series in the dataset
+must share the same periodicity --- annual, quarterly, or monthly. If
+the same indicator is available at more than one frequency, the data
+should be split by periodicity and anomaly detection run separately on
+each subset.
+
+**Long vs. wide format**
+
+Time series data is commonly stored in one of two formats: wide or long.
+macroanomaly requires data in long format, so datasets stored in wide
+format must be reshaped before use. The package does not provide
+reshaping functions; this step should be performed using base R
+(reshape()) or a package such as tidyr (pivot_longer()).
+
+In **wide format**, each row represents a single subject --- an
+indicator-geography combination --- and each time period occupies a
+separate column. This produces a compact table that is easy to read at a
+glance but is not well-suited to programmatic processing.
+
+  ------------------------------------------------------------------------
+  Indicator        Geography   Y2020      Y2021      Y2022      Y2023
+  ---------------- ----------- ---------- ---------- ---------- ----------
+  Population       Belgium     11492641   11521238   11584008   11697557
+
+  ------------------------------------------------------------------------
+
+In **long format**, each row represents a single observation at a single
+point in time for a single subject. The table is narrower but taller,
+with separate columns identifying the indicator, geography, time period,
+and observed value. This is the structure macroanomaly expects.
+
+  ------------------------------------------------------------------------
+  Indicator             Geography        Year             Value
+  --------------------- ---------------- ---------------- ----------------
+  Population            Belgium          2020             11492641
+
+  Population            Belgium          2021             11521238
+
+  Population            Belgium          2022             11584008
+
+  Population            Belgium          2023             11697557
+  ------------------------------------------------------------------------
+
+Some indicators carry additional ***dimensions***. For example,
+population data disaggregated by sex would include an extra column
+identifying the subgroup. Each unique combination of indicator,
+dimension(s), geography, and time period corresponds to a single row.
+
+  ------------------------------------------------------------------------
+  Indicator             Sex       Geography    Year       Value
+  --------------------- --------- ------------ ---------- ----------------
+  Population by Sex     Total     Belgium      2020       11492641
+
+  Population by Sex     Total     Belgium      2021       11521238
+
+  Population by Sex     Total     Belgium      2022       11584008
+
+  Population by Sex     Total     Belgium      2023       11697557
+
+  Population by Sex     Male      Belgium      2020       5660064
+
+  Population by Sex     Male      Belgium      2021       5677211
+
+  Population by Sex     Male      Belgium      2022       5708902
+
+  Population by Sex     Male      Belgium      2023       5761410
+
+  Population by Sex     Female    Belgium      2020       5832577
+
+  Population by Sex     Female    Belgium      2021       5844027
+
+  Population by Sex     Female    Belgium      2022       5875106
+
+  Population by Sex     Female    Belgium      2023       5936147
+  ------------------------------------------------------------------------
+
+**Required columns**
+
+macroanomaly requires the following columns to be present in the input
+dataset. Column names are flexible --- the package does not impose
+specific naming conventions --- but the content of each column must
+conform to the descriptions below.
+
+- **Indicator identifier**: a code or label uniquely identifying the
+  indicator.
+
+- **Dimensions** (if applicable): one column per dimension, such as sex
+  or age group.
+
+- **Geography**: a single column identifying the country, region, or
+  territory. Each geography must be represented as a single value ---
+  nested or hierarchical geographic structures should be flattened
+  before input.
+
+- **Time period**: the year, quarter, or month of the observation. All
+  entries in a given dataset must share the same periodicity.
+
+- **Observed value**: the numeric value of the indicator for the given
+  combination of identifier, dimensions, geography, and time period.
+
+The combination of indicator, dimensions, geography, and time period
+must be unique for every row in the dataset. Duplicate combinations will
+cause errors in the detection functions and should be resolved during
+data preparation.
+
+### Imputation of Missing Values
+
+Time series of social and economic indicators frequently contain missing
+values, and most anomaly detection methods cannot handle them directly.
+macroanomaly therefore imputes missing values automatically as part of
+its preprocessing pipeline, via the normalize() function (called with
+impute = TRUE). The imputation is performed solely to enable anomaly
+detection and has no status beyond that: imputed values should never be
+saved to a database or used for any purpose other than running the
+detection methods.
+
+This point deserves emphasis. Imputation for anomaly detection is
+intentionally simple and neutral --- designed to fill gaps in a way that
+does not distort the series\' behavior, not to produce defensible
+estimates of what the missing values actually were. If gap-filled series
+are needed for dissemination or analysis, a dedicated imputation
+approach is required: one that is methodologically appropriate for the
+indicator in question, optimized for that context, and documented in a
+transparent and reproducible manner.
+
+Because macroanomaly may flag imputed values as anomalies during
+detection, the package automatically excludes such flags from its
+outputs. Only anomalies detected in originally observed values are
+reported and require review or treatment.
+
+Missing data require special care because preprocessing choices can
+affect anomaly scores. When imputation is used to create a continuous
+series for algorithmic purposes, users should assess whether the
+imputation method changes the apparent severity or location of
+anomalies. Flags on imputed observations, or on observations adjacent to
+long gaps, should be treated as lower-confidence signals. In operational
+use, review tables and visualizations should distinguish observed from
+imputed values, and users should compare results before and after
+imputation when missingness is substantial. Imputed values may support
+screening, but they should not be treated as equivalent to observed data
+for classification or correction decisions.
+
+**Imputation methods**
+
+The imputation step draws on functions from the imputeTS R package. The
+following methods are available:
+
+- **na_interpolation** (default): replaces missing values using
+  interpolation. The default interpolation type is linear; spline and
+  Stineman interpolation are also available.
+
+- **na_kalman**: uses a Kalman filter on a state-space model to estimate
+  missing values --- well-suited to series with trend or seasonal
+  structure.
+
+- **na_mean**: replaces missing values with the series mean, optionally
+  computed over a local window.
+
+- **na_locf**: carries the last observed value forward to fill
+  subsequent gaps (Last Observation Carried Forward).
+
+- **na_ma**: replaces missing values with a weighted moving average of
+  neighboring observations.
+
+- **na_seadec**: applies seasonal decomposition before interpolating
+  residuals, making it appropriate for series with strong seasonal
+  patterns.
+
+- **na_random**: fills gaps with random draws from the observed
+  distribution of the series.
+
+The default method, na_interpolation with linear interpolation, is
+appropriate for most development data series and requires no parameter
+tuning. For series with pronounced trends or seasonality, na_kalman or
+na_seadec may produce more neutral imputations. Full documentation for
+each method, including parameter options, is available in the imputeTS
+package documentation.
+
+### Detrending and Deseasonalization
+
+Most anomaly detection methods assume that a series is approximately
+stationary --- that its mean and variance remain roughly constant over
+time. Social and economic time series routinely violate this assumption:
+they may exhibit long-term trends (gradual upward or downward drift) and
+seasonal patterns (repeating cycles tied to the calendar). If these
+components are not removed before detection, the result may be
+consequential: flagging observations that are unusual only relative to a
+global mean when they are perfectly normal for their position in a trend
+or seasonal cycle (false positives), or missing genuine anomalies that
+are absorbed into an expected pattern (false negatives).
+
+**Available methods**
+
+A range of approaches can be used to remove trend and seasonal
+components, including differencing, regression-based decomposition,
+moving average filters, STL (Seasonal-Trend decomposition using LOESS),
+TBATS, Prophet, and state-space models such as the Kalman filter. These
+methods vary in their complexity, assumptions, and suitability for
+different series characteristics.
+
+**Implementation in macroanomaly**
+
+Detrending and deseasonalization are handled automatically within
+macroanomaly\'s normalize() function, prior to any detection step. Users
+do not need to preprocess series manually. The function applies STL
+decomposition by default, which is well-suited to the short, potentially
+irregular series typical of development data, and returns the remainder
+component as input to the detection methods. The choice of decomposition
+method can be adjusted through the function\'s parameters for users who
+wish to experiment with alternatives.
+
+## Implementation Examples
+
+We provide two examples of scripts, one with annual data, the other one
+with monthly data. They can be replicated (only need to change the
+default folder name). Make sure the required packages are installed (if
+necessary, install them). Note that the results may vary as datasets are
+updated regularly.
+
+### Example 1: Annual Series of Education Indicators
+
+This example uses a subset of the World Development Indicators (WDI).
+The dataset is filtered to education-related indicators --- those whose
+identifier begins with \"SE.\" --- and restricted to observations from
+1980 onwards. As of 18 April 2026, this selection comprises 1,015,910
+observations across 147 indicators and 256 geographies.
+
+```{r}
+#| eval: false
+
+#----------------------------------------------------------------------
+# Anomaly detection in WDI dataset - Standard Education (SE) indicators
+#----------------------------------------------------------------------
+
+# Load the required R packages
+library(macroanomaly)
+library(collapse)
+library(tidyr)
+library(dplyr)
+
+# Set the default folder >>> (enter your own) <<<
+setwd("C:/.../")
+
+# Download the WDI dataset if not previously done, read, and filter (267 Mb)
+wdi_url <- "https://databank.worldbank.org/data/download/WDI_CSV.zip"
+if (!file.exists("WDICSV.CSV")) {
+  download.file(wdi_url, destfile = "WDI.zip")
+  unzip("WDI.zip")
+}
+
+df_wdi_SE <- read.csv("WDICSV.csv")
+df_wdi_SE <- df_wdi_SE[startsWith(df_wdi_SE$Indicator.Code, "SE."), ]
+
+# Reshape the dataset from wide to long
+df_wdi_SE <- df_wdi_SE %>%
+  pivot_longer(cols = starts_with("X"),
+               names_to = "Year", values_to = "Value") %>%
+  mutate(Year = as.integer(sub("X", "", Year)))
+
+# Drop years < 1980 and series with less than 10 non-missing values
+df_wdi_SE <- df_wdi_SE[df_wdi_SE$Year >= 1980, ]
+min_obs <- 10
+df_wdi_SE <- df_wdi_SE %>%
+  group_by(Country.Code, Indicator.Code) %>%
+  filter(sum(!is.na(Value)) >= min_obs) %>%
+  ungroup()
+
+# Normalize the dataset (detrend, impute missing values)
+df_wdi_SE |>
+  macroanomaly::normalize(
+    .value_col = "Value",
+    .country_col = c("Country.Code", "Country.Name"),
+    .indicator_col = "Indicator.Code",
+    .time_col = "Year",
+    .detrend = TRUE,
+    .impute = TRUE) -> wdi_SE_normalized
+
+# Detect anomalies (6 methods)
+wdi_SE_normalized |>
+  macroanomaly::detect(
+    .method = c("tsoutlier", "isotree", "capa", "outliertree", "zscore", "hampel"),
+    .args = list(
+      capa = c(.min_seg_len = 3),
+      isotree = c(threshold = 0.7),
+      hampel = c(.trim = TRUE, .trim_sd = 1.5)),
+    .additional_cols = TRUE) -> wdi_SE_anomalies
+
+# Sort the anomalies data frame by severity of anomalies
+wdi_SE_anomalies <- wdi_SE_anomalies[
+  order(-wdi_SE_anomalies$outlier_indicator_total,
+        -wdi_SE_anomalies$absZscore_zscore), ]
+
+# Number of anomalies detected
+summary(wdi_SE_anomalies)
+table(wdi_SE_anomalies$outlier_indicator_total)
+
+# Save output to CSV (all observations, with anomaly status by method)
+fn <- paste0("WDI_SE_ANOMALIES", "_", format(Sys.Date(), "%Y-%m-%d"), ".CSV")
+write.csv(wdi_SE_anomalies, file = fn, row.names = FALSE)
+
+# Plot a sample of anomalies (top 20)
+for (i in 1:20) {
+  if (wdi_SE_anomalies$Imputed[i] == FALSE) {
+    subttl <- paste0(wdi_SE_anomalies$Country.Name[i], " - ",
+                     wdi_SE_anomalies$Indicator.Name[i])
+    print(plot(wdi_SE_anomalies,
+               country = wdi_SE_anomalies$Country.Code[i],
+               indicator = wdi_SE_anomalies$Indicator.Code[i],
+               .total_threshold = 2, x.lab = subttl))
+  }
+}
+
+# To plot one selected anomaly (provide country code and indicator code)
+plot(wdi_SE_anomalies,
+     country = "IRL", # Ireland
+     indicator = "SE.PRM.ENRR", # School enrollment, primary (% gross)
+     .total_threshold = 2, x.lab = "Year")
+```
+
+
+Running all six detection methods on this dataset with the parameters
+shown in the script produced the following distribution of flags across
+observations:
+
+  -----------------------------------------------------------------------
+       Methods flagging the      Number of observations
+           observation           
+  ------------------------------ ----------------------------------------
+         6 methods (All)         0
+
+            5 methods            11
+
+            4 methods            2,987
+
+            3 methods            13,131
+
+            2 methods            29,599
+
+             1 method            483,699
+
+             0 method            486,483
+  -----------------------------------------------------------------------
+
+No observation was flagged unanimously by all six methods, which is
+consistent with the expectation that different methods have different
+sensitivities and are designed to detect different types of anomalies.
+Observations flagged by a larger number of methods should be prioritized
+for review, as convergence across methods provides stronger evidence of
+a genuine anomaly. Anomalies flagged by only one or two methods could in
+this case probably be ignored by data curators.
+
+**Output and visualization**
+
+The output dataset is sorted first by the number of methods that flagged
+each observation, then by the absolute Z-score, so that the most
+anomalous observations appear at the top. The top 20 flagged
+observations are displayed as time series plots, each showing the full
+series to which the flagged observation belongs. An example plot is
+shown below. Plots distinguish between flagged and non-flagged
+observations, and between originally observed and imputed values,
+allowing reviewers to quickly assess the context of each detection.
+
+![- Anomaly plot - Annual time
+series](../images/media/image5.png){width="6.5in"
+height="3.9381944444444446in"}
+
+The full output is saved as a CSV file. This file contains every
+observation in the input dataset --- flagged or not, imputed or not ---
+and includes the following fields for each row: an imputation indicator,
+a binary anomaly flag for each detection method, and the anomaly score
+where the method produces one. This structure allows users to apply
+their own prioritization criteria and to filter or rank detections in
+ways suited to their specific review workflow.
+
+### Example 2: Monthly Series of Unemployment Rate
+
+This example applies the same workflow to a different dataset: monthly
+estimates of the unemployment rate by sex and age group, sourced from
+the International Labour Organisation (ILO). As of 18 April 2026, this
+selection comprises 409,566 observations across 48 indicators and 68
+geographies.
+
+The primary difference from the previous example is the frequency of the
+data. The time periods in the data file are provided in the format
+yyyyMmm where yyyy is the year and mm is the month (01 to 12). Monthly
+series have stronger and more regular seasonal patterns than annual
+series, and the decomposition step must account for this. In
+macroanomaly, the monthly frequency is specified via the .frequency
+argument of the normalize() function, which ensures that trend and
+seasonal components are removed appropriately before detection is run.
+For this example, four of the six available detection methods are
+applied.
+
+```{r}
+#| eval: false
+
+#----------------------------------------------------------------------
+# Anomaly detection in ILO dataset - Unemployment rate by sex and age group
+#----------------------------------------------------------------------
+
+library(macroanomaly)
+library(readr)
+library(collapse)
+library(tidyr)
+library(dplyr)
+
+# Set default folder >>> (enter your own) <<<
+setwd("C:/.../")
+
+# Download the data from ILO website
+df <- read_csv("https://rplumber.ilo.org/data/indicator/?id=UNE_DEAP_SEX_AGE_RT_M&format=.csv")
+
+# Create a code i_code for each indicator (combine indicator, sex, age group)
+df$icode <- paste0("UNE_", df$sex, "_", df$classif1)
+
+# Drop series with insufficient number of non-missing values
+min_obs <- 36
+df <- df %>%
+  group_by(ref_area, icode) %>%
+  filter(sum(!is.na(obs_value)) >= min_obs) %>%
+  ungroup()
+
+# Normalize the dataset (detrend, impute missing values)
+df |>
+  macroanomaly::normalize(
+    .value_col = "obs_value",
+    .country_col = "ref_area",
+    .indicator_col = "icode",
+    .time_col = "time",
+    .frequency = "monthly",
+    .detrend = TRUE,
+    .impute = TRUE) -> df_normalized
+
+# Detect anomalies (4 methods)
+df_normalized |>
+  macroanomaly::detect(
+    .method = c("tsoutlier", "capa", "zscore", "hampel"),
+    .args = list(
+      capa = c(.min_seg_len = 3),
+      hampel = c(.trim = TRUE, .trim_sd = 1.5)),
+    .additional_cols = TRUE) -> df_anomalies
+
+df_anomalies <- df_anomalies[
+  order(-df_anomalies$outlier_indicator_total,
+        -df_anomalies$absZscore_zscore), ]
+
+# Number of anomalies detected
+summary(df_anomalies)
+table(df_anomalies$outlier_indicator_total)
+
+# Save output to CSV
+# fn <- paste0("ILO_UNE_ANOMALIES", "_", format(Sys.Date(), "%Y-%m-%d"), ".CSV")
+# write.csv(df_anomalies, file = fn, row.names = FALSE)
+
+# Plot a sample of anomalies
+for (i in 1:20) {
+  if (df_anomalies$Imputed[i] == FALSE) {
+    print(plot(df_anomalies,
+               country = df_anomalies$ref_area[i],
+               indicator = df_anomalies$icode[i],
+               .total_threshold = 2, x.lab = "Month"))
+  }
+}
+```
+
+
+Running the four selected detection methods on this dataset with the
+parameters shown in the script produced the following distribution of
+flags across observations:
+
+  -----------------------------------------------------------------------
+       Methods flagging the      Number of observations
+           observation           
+  ------------------------------ ----------------------------------------
+         4 methods (All)         102
+
+            3 methods            1,512
+
+            2 methods            2,005
+
+             1 method            164,376
+
+             0 method            241,571
+  -----------------------------------------------------------------------
+
+The example plot shown below shows outliers in the male unemployment
+rate for population aged 35 to 44 in 2020, which may be explained by the
+COVID19 pandemic.
+
+![- Anomaly plot - Monthly time
+series](../images/media/image6.png){width="6.5in"
+height="4.045833333333333in"}
+

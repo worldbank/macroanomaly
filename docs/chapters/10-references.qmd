@@ -1,0 +1,99 @@
+# References {.unnumbered}
+
+1.  Bengtsson H (2025). *R.utils: Various Programming Utilities*. R
+    package v2.13.0. doi:10.32614/CRAN.package.R.utils.
+
+2.  Borchers H (2025). **pracma**: Practical Numerical Math Functions.
+    doi:10.32614/CRAN.package.pracma.
+    \<https://doi.org/10.32614/CRAN.package.pracma\>, R package version
+    2.4.6, \<https://CRAN.R-project.org/package=pracma\>.
+
+3.  Cortes D (2026). **outliertree**: Explainable Outlier Detection
+    Through Decision Tree Conditioning.
+    doi:10.32614/CRAN.package.outliertree
+    \<https://doi.org/10.32614/CRAN.package.outliertree\>, R package
+    version 1.10.0-1,
+    \<https://CRAN.R-project.org/package=outliertree\>.
+
+4.  Cortes D (2025). **isotree**: Isolation-Based Outlier Detection\_.
+    doi:10.32614/CRAN.package.isotree
+    \<https://doi.org/10.32614/CRAN.package.isotree\>, R package version
+    0.6.1-4, \<https://CRAN.R-project.org/package=isotree\>.
+
+5.  Fisch A, Grose D, Eckley IA, Fearnhead P, Bardwell L (2024).
+    "**anomaly**: Detection of Anomalous Structure in Time Series Data."
+    Journal of Statistical Software\_, \*110\*(1), 1-24.
+    doi:10.18637/jss.v110.i01 \<https://doi.org/10.18637/jss.v110.i01\>.
+
+6.  Hyndman R, Athanasopoulos G, Bergmeir C, Caceres G, Chhay L,
+    O\'Hara-Wild M, Petropoulos F, Razbash S, Wang E, Yasmeen F (2026).
+    ***forecast**: Forecasting functions for time series and linear
+    models*.
+    [doi:10.32614/CRAN.package.forecast](https://doi.org/10.32614/CRAN.package.forecast),
+    R package version 9.0.2,
+    \<[https://pkg.robjhyndman.com/forecast/\>](https://pkg.robjhyndman.com/forecast/).
+
+7.  Krantz S (2025). ***collapse**: Advanced and Fast Data
+    Transformation in R*.
+    \<[doi:10.5281/zenodo.8433090](https://doi.org/10.5281/zenodo.8433090)\>,
+    R package version 2.1.6, \<<https://fastverse.org/collapse/>\>.
+
+8.  López-de-Lacalle J (2024). **tsoutliers**: Detection of Outliers in
+    Time. Series. Doi:10.32614/CRAN.package.tsoutliers.
+    \<https://doi.org/10.32614/CRAN.package.tsoutliers\>, R package
+    version 0.6-10, \<https://CRAN.R-project.org/package=tsoutliers\>.
+
+9.  O\'Hara-Wild M, Hyndman R, Wang E (2024). ***feasts**: Feature
+    Extraction and Statistics for Time Series*. R package v0.4.1.
+    doi:10.32614/CRAN.package.feasts.
+
+10. O\'Hara-Wild M, Hyndman R, Wang E (2024). ***fabletools**: Core
+    Tools for Packages in the \'fable\' Framework*. R package v0.5.0.
+    doi:10.32614/CRAN.package.fabletools.
+
+11. Pedersen T (2025). ***patchwork**: The Composer of Plots*. R package
+    v1.3.1. doi:10.32614/CRAN.package.patchwork.
+
+12. Perfetti Villa L, L. Newhouse D, Dupriez O (2026). **macroanomaly**:
+    Macroanomaly: Detects outliers in time series. R package version
+    \<https://github.com/worldbank/macroanomaly\>.
+
+13. R Core Team (2025). **R**: A Language and Environment for
+    Statistical Computing. R Foundation for Statistical Computing,
+    Vienna,
+    Austria. [https://www.R-project.org/](https://www.r-project.org/)
+
+14. Solatorio A, Dupriez O (2026). **ai4data.anomaly**: Classifying and
+    eliciting explanation of data anomalies using LLMs. Python package
+    \<<https://github.com/worldbank/ai4data/tree/main/src/ai4data/anomaly/explanation>\>.
+
+15. Solatorio A, Dupriez O (2026). Data anomaly classification and
+    explanation demo notebook:
+    \<<https://github.com/worldbank/ai4data/blob/main/notebooks/data-anomaly/Timeseries_Anomaly_Explanation_with_LLMs.ipynb>\>
+
+16. Steffen Moritz, Thomas Bartz-Beielstein (2017). "**imputeTS**: Time
+    Series Missing Value Imputation in R." The R Journal\_, \*9\*(1),
+    207-218. doi:10.32614/RJ-2017-009
+    \<https://doi.org/10.32614/RJ-2017-009\>.
+
+17. Wang E, Cook D, Hyndman RJ (2020). \"A new tidy data structure to
+    support exploration and modeling of temporal data.\" *Journal of
+    Computational and Graphical Statistics*, 29(3), 466-478.
+    doi:10.1080/10618600.2019.1695624.
+
+18. Wickham H (2016). ***ggplot2**: Elegant Graphics for Data Analysis*.
+    Springer-Verlag New York. ISBN 978-3-319-24277-4,
+    \<[https://ggplot2.tidyverse.org](https://ggplot2.tidyverse.org/)\>.
+
+19. Wickham H (2023). ***stringr**: Simple, Consistent Wrappers for
+    Common String Operations*. R package v1.5.1.
+    doi:10.32614/CRAN.package.stringr.
+
+20. Wickham H, Vaughan D, Girlich M (2025). **tidyr**: Tidy Messy Data.
+    doi:10.32614/CRAN.package.tidyr.
+    \<https://doi.org/10.32614/CRAN.package.tidyr\>, R package version
+    1.3.2, \<https://CRAN.R-project.org/package=tidyr\>.
+
+21. Wickham H, Kuhn M, Vaughan D (2025). ***generics**: Common S3
+    Generics not Provided by Base R Methods Related to Model Fitting*. R
+    package v0.1.4. doi:10.32614/CRAN.package.generics.

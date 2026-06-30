@@ -1,0 +1,43 @@
+# Preface {.unnumbered}
+
+**Acknowledgments**
+
+The document was produced by Olivier Dupriez (Deputy Chief
+Statistician), Aivin V. Solatorio (Program Manager), and Luciano
+Perfetti Villa (Consultant). David Newhouse participated in the
+development of the macroanomaly package.
+
+Feedback and input was received from colleagues from the World Bank
+Development Data Group, including Yan Bai, Thijs Benschop, Daniel
+Boller, Christoph Lakner, Hiroko Maeda, Daniel Gerszon Mahler, Joao
+Miguel Falcao Pinto Da Silva, Jaime Estuardo Fernandez Romero, Evis
+Rucaj, Emi Suzuki, and Matthew Welch, and from the Data Quality Working
+Group in the Indicator and Statistics Unit.
+
+**License**
+
+![Creative Commons license](images/media/image1.png){width="0.8958333333333334in"
+height="0.3277777777777778in" fig-align="left"}
+
+This document was created by the World
+Bank Group. It is shared under a CC BY 4. 0 Attribution license.
+
+**Use of AI**
+
+This document was produced with the assistance of AI---specifically
+Claude Sonnet 4.6 by Anthropic. All AI-generated content was reviewed
+and validated by the authors before inclusion.
+
+**Maintenance and Tools**
+
+> ![GitHub](images/media/image2.jpeg){width="0.5680555555555555in"
+> height="0.5680555555555555in" fig-align="left"}
+> 
+> This document and the related tools are
+> maintained on GitHub.
+>
+> The macroanomaly package and documentation are available at:
+> <https://github.com/worldbank/macroanomaly>
+>
+> The AI tools for anomaly classification and explanation are available
+> at: <https://github.com/worldbank/ai4data>

@@ -1,0 +1,43 @@
+# The macroanomaly R Package 
+
+macroanomaly is an R package designed to support the detection of
+anomalies in social and economic time series, with a focus on the
+indicators central to the World Bank Group\'s development data work. It
+was developed and is maintained by the Office of the Chief Statistician
+and the Development Data Group at the World Bank Group (WBG), as part of
+the broader implementation of the WBG Development Data Quality Policy.
+The package is available on GitHub under an MIT License with an IGO
+rider (see <https://github.com/worldbank/macroanomaly>).
+
+Rather than introducing entirely new algorithms, macroanomaly draws on
+functions from well-established R packages and organizes them into a
+coherent, accessible workflow tailored to the characteristics of
+development data. Many existing anomaly detection tools are designed for
+contexts --- such as industrial process monitoring or biomedical signal
+analysis --- where data are abundant, regularly spaced, and free of
+seasonal distortions. Social and economic time series rarely meet these
+conditions: annual series are often short (sometimes only a few dozen
+observations), may contain gaps from missing values, and frequently
+exhibit trends or seasonal patterns that must be accounted for before
+anomalies can be reliably identified. macroanomaly is built to handle
+these conditions directly.
+
+The package implements a three-step workflow. First, it prepares the
+data by imputing missing values in a statistically neutral manner and
+transforming each series to achieve stationarity --- that is, removing
+trends and seasonal components so that anomalies can be detected against
+a stable baseline. Second, it applies a selection of statistical and
+machine learning methods to flag potential anomalies. Third, it produces
+outputs to support review and reporting: a CSV file in which flagged
+observations are annotated with scores or metrics for each detection
+method applied, and a set of plots to help users visualize the results.
+The package takes as input a dataset in long format, making it
+straightforward to integrate into standard data pipelines.
+
+This document describes the anomaly detection methods included in
+Version 1.1.0. The package is under active development, and future
+versions may introduce additional methods. The GitHub repository always
+holds the latest release, a complete changelog, and a vignette
+documenting each function. Users are encouraged to submit feedback,
+suggestions, and issue reports through the repository\'s Issues section.
+

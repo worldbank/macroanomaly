@@ -1,0 +1,261 @@
+# Treating Anomalies
+
+The anomaly detection and classification processes described in Sections
+7 and 8 are designed to identify and interpret unusual observations in
+the data. They produce a targeted and classified review list---but they
+do not produce treatment decisions. All changes to the database, whether
+corrections, removals, imputations, or annotations, must follow clearly
+defined procedures, require appropriate approvals, and be fully
+documented. This section describes how to translate classification
+outputs into responsible treatment actions.
+
+## Prioritization of Treatment
+
+The detection and classification processes may surface a large number of
+anomalies at once, and not all of them can or should be addressed with
+the same urgency. A systematic approach to prioritization is essential
+to avoid spreading curation effort thinly across the full set of flags
+while genuine errors in high-impact series go unaddressed.
+
+The combination of classification, evidence strength, model agreement,
+and detection confidence together create a natural triage ordering. The
+following sequence is recommended as a starting framework, to be adapted
+to each team\'s institutional context and resources:
+
+1.  **Data error cases first.** These represent the highest-probability
+    genuine mistakes in the data and warrant immediate investigation.
+    The absence of any documented external driver, combined with a
+    movement that is inconsistent with plausible real-world variation,
+    is the strongest available signal that something is wrong with the
+    data rather than with the world.
+
+2.  **Measurement system update cases.** These are often resolvable
+    quickly: the relevant methodological documentation either exists or
+    it does not. If a published series-break note confirms the change,
+    annotation can proceed. If no documentation exists, the case should
+    be escalated for methodological review.
+
+3.  **External driver cases with strong direct evidence.** These
+    represent the majority of confirmed anomalies. Where both models
+    agree and evidence is strong, the curator\'s role is verification
+    and annotation acceptance, not investigation from scratch. These
+    cases can often be processed efficiently in bulk.
+
+4.  **External driver cases with moderate or weak evidence.** These
+    require more careful evaluation. The model has identified a
+    plausible explanation but the connection to the specific indicator
+    movement is not definitive. Treat these as hypotheses to test
+    against source documentation rather than conclusions to accept.
+
+5.  **Disagree cases, regardless of classification.** Model disagreement
+    is a signal that the evidence is genuinely ambiguous. These cases
+    should not be resolved by defaulting to the higher-confidence
+    model\'s view --- they warrant independent curator review before any
+    treatment is applied.
+
+6.  **Insufficient data cases last.** In the absence of a documented
+    explanation or a clear error signal, these are the hardest cases to
+    resolve and the least likely to yield actionable findings.
+    Deprioritize unless the magnitude is unusually large, the indicator
+    is of high institutional importance, or domain knowledge suggests a
+    specific direction to investigate.
+
+In addition to the classification-based ordering above, the following
+factors should inform prioritization across all categories:
+
+- **Institutional relevance**: For the World Bank Group, indicators
+  produced by the Bank (as opposed to third‑party indicators
+  redistributed by the Bank) may be prioritized for timely remediation.
+
+- **Recency.** Anomalies affecting recent reference periods, or those
+  near an upcoming publication deadline, should be addressed before
+  older flags in the same series.
+
+- **User impact.** Indicators with high query volume or significant
+  policy relevance should be prioritized over less-used series with
+  equivalent anomaly characteristics.
+
+- **Detection confidence.** Observations flagged by multiple independent
+  detection methods and with high absolute z-scores should be considered
+  more certain than those flagged by a single method at a lower
+  threshold.
+
+## Governance and Accountability
+
+Treating anomalies means modifying or annotating data that users and
+downstream systems depend on. This requires clear ownership, defined
+workflows, and comprehensive documentation---both to ensure that
+decisions are made by the right people and to provide a traceable record
+of what was changed, why, and by whom.
+
+### Roles and approvals
+
+Before beginning a treatment cycle, the following roles should be
+defined:
+
+- Who is responsible for reviewing flagged anomalies and making initial
+  treatment recommendations.
+
+- Who has the authority to decide on treatment actions---corrections,
+  removals, imputations, and annotations.
+
+- Who approves changes before they are committed to the production
+  database.
+
+- Who is responsible for notifying external data providers when
+  anomalies are identified in data originating from third parties.
+
+### Versioning and audit trails
+
+All changes to the data must be versioned and logged. The audit trail
+for each modified observation should capture at minimum:
+
+- The original value and the new value (or the fact of removal).
+
+- The date and time the change was made.
+
+- The identity of the person who made the change and, where applicable,
+  the person who approved it.
+
+- The method applied---recalculation, imputation, manual
+  correction---and its basis.
+
+This documentation is mandatory. It explains why each value is recorded
+as it is and helps prevent known errors from returning in future data
+refreshes.
+
+## Treatment of Confirmed Errors
+
+When an anomaly is confirmed as a data error---through curator review,
+cross-checking against source data, or consultation with the originating
+data provider---the goal is to replace it with a correct value wherever
+feasible. The path to a correct value depends on the nature of the error
+and the availability of source material, and should be determined in
+consultation with subject matter experts who understand the indicator
+and the data production process.
+
+### Obtaining a correct value
+
+The following methods may be used, in approximate order of preference:
+
+- **Recalculation from source data.** Where the original microdata or
+  source series is accessible, the correct value can be derived
+  directly. This is the most defensible approach and should be used
+  wherever possible.
+
+- **Correction in the originating database.** For anomalies in data that
+  originate from an external source, the data provider should be
+  notified and the correction applied upstream. This prevents the error
+  from being reintroduced on the next data refresh and ensures
+  consistency across systems that draw from the same source.
+
+- **Imputation.** Where a correct value cannot be obtained from source
+  data, a statistically sound imputed value may be used as a
+  replacement. The imputation method and its assumptions must be
+  documented alongside the imputed value in the database. An
+  **is_imputed** flag or equivalent indicator must be set, and the
+  imputation must be visible to users through all data access channels.
+
+- **Removal.** If a correct value cannot be obtained and imputation is
+  not appropriate, the observation should be removed. Retaining a known
+  error in the database is worse than a gap---it misleads users and any
+  downstream analysis that relies on the series.
+
+### Handling corrections from external sources
+
+Where a correction is applied in the World Bank database but has not yet
+been fixed in the originating source, the corrected value must be
+accompanied by an annotation that records:
+
+- That the value has been adjusted from the original source value.
+
+- The nature of the correction and the basis for it.
+
+- That the adjusted value should not be attributed to the originating
+  provider as their published figure.
+
+Tagged correction records also allow automated data refresh processes to
+recognize previously corrected values and avoid reintroducing the
+original error. Without this tagging, a future refresh that overwrites
+the corrected value with the erroneous source value will silently undo
+the curation work.
+
+## Treatment of Legitimate Outliers
+
+Anomalies confirmed as genuine outliers---statistically extreme but
+correct values that accurately reflect an unusual real-world
+event---should be retained and annotated. The annotation serves two
+purposes: it explains the value to end users who might otherwise
+question its accuracy, and it signals that the observation has been
+reviewed and its provenance understood.
+
+### Annotation content
+
+Annotations for legitimate outliers should be concise, specific, and
+written in plain language accessible to a non-specialist user. They
+should identify the cause of the anomaly and describe, in general terms,
+its effect on the indicator. Where the cause is a well-documented
+external event, the annotation should name it. Where the cause is a
+methodological change, the annotation should reference the change and,
+where possible, link to the documentation.
+
+AI-generated narratives from the explanation pipeline are an appropriate
+starting point for annotation text, subject to validation by a subject
+matter expert. The expert\'s role is to confirm that the cited
+explanation is accurate for the specific country and indicator, that the
+causal mechanism described is plausible, and that the language is
+appropriate for the intended audience.
+
+### Annotation dissemination
+
+An annotation that exists only in a curation system provides no benefit
+to data users. Once validated, annotations must be made available across
+all channels through which users access the data:
+
+- In database tables, as a metadata field attached to the observation or
+  series.
+
+- In data visualizations, as tooltip text or footnotes that appear when
+  users interact with anomalous data points.
+
+- In APIs, as structured fields in the response payload that can be
+  programmatically retrieved alongside the data value.
+
+- In downloaded datasets, as accompanying notes or a dedicated
+  annotations column.
+
+Where technically feasible, it is also valuable to expose evidence
+source citations through these same channels. Transparency about how
+anomalies were identified and why they were classified as legitimate
+supports user interpretation and strengthens trust in the data.
+
+## Memory and Suppression of Reviewed Anomalies
+
+Once an anomaly has been reviewed, classified, and either corrected or
+annotated, it should be suppressed from future detection runs for the
+same observation. If the detection process is run again---as part of a
+periodic refresh, a re-run after a data update, or a quality audit---it
+will by design re-flag the same unusual observations. Without a
+suppression mechanism, curators will repeatedly encounter anomalies that
+have already been investigated and resolved, wasting review capacity and
+eroding confidence in the detection system.
+
+The suppression record should be stored alongside the audit trail for
+the original treatment decision and should include the classification
+assigned, the treatment applied, and the date of review. It should be
+associated with the specific (indicator, country, year window)
+combination so that future detection runs can identify and exclude
+previously reviewed cases.
+
+Suppression does not mean permanently ignoring the observation. If new
+data becomes available that changes the context---a source revision that
+contradicts a previous correction, or a newly published methodology note
+that reframes a previously unexplained anomaly---the suppression record
+can be reviewed and lifted. The goal is to avoid redundant
+re-investigation of settled cases, not to prevent updates when new
+information warrants them.
+
+![- Displaying annotations in
+charts](../images/media/image8.png){width="6.4956364829396325in"
+height="5.561096894138233in"}
+

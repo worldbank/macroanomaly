@@ -1,0 +1,43 @@
+project:
+  type: book
+  output-dir: _site
+
+book:
+  title: "Using the macroanomaly R Package and an AI-Enabled Anomaly Classifier"
+  subtitle: "DRAFT — Version 0.0.5"
+  author: "World Bank Group — Office of the Chief Statistician and Development Data Group"
+  date: "2026-06-26"
+  output-file: manual
+  downloads: [pdf]
+  repo-url: https://github.com/worldbank/macroanomaly
+  chapters:
+    - index.qmd
+    - chapters/01-introduction.qmd
+    - chapters/02-data-quality-assurance.qmd
+    - chapters/03-defining-anomalies.qmd
+    - chapters/04-scope-and-objective.qmd
+    - chapters/05-macroanomaly-package.qmd
+    - chapters/06-anomaly-detection-methods.qmd
+    - chapters/07-detecting-anomalies-in-practice.qmd
+    - chapters/08-ai-classification.qmd
+    - chapters/09-treating-anomalies.qmd
+    - chapters/10-references.qmd
+
+website:
+  site-url: https://worldbank.github.io/macroanomaly/
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    number-sections: true
+    number-depth: 3
+  pdf:
+    documentclass: report
+    toc: true
+    number-sections: true
+    number-depth: 3
+    colorlinks: true
+    urlcolor: Cerulean
+    geometry:
+      - margin=1in

@@ -1,0 +1,82 @@
+# Anomaly Detection in the Data Quality Assurance Context
+
+The table below, adapted from work by Thijs Benschop, Daniel Boller, and
+Matthew Welch, situates anomaly detection within the broader framework
+of data quality assurance and quality control for time series. The main
+point is that anomaly detection is only one of several diagnostic
+approaches used to assess data quality. Some data-quality issues are
+best identified through metadata, source documentation, and
+production-process controls, while others are primarily statistical and
+therefore well suited to anomaly detection methods.
+
+This distinction matters because an anomalous observation is not
+necessarily an error. It may reflect a genuine economic shock, a
+methodological break, a reporting gap, or a processing mistake. Anomaly
+detection can help identify observations or periods that merit review,
+but it does not by itself determine the cause, nor does it decide
+whether a value should be corrected, retained, revised, or annotated.
+Those decisions belong within a broader governance process that includes
+metadata review, reproducibility checks, and subject-matter expertise.
+
+  -----------------------------------------------------------------------------------------
+  **Type of data   **Typical          **Primary         **Role of anomaly **Typical
+  quality issue**  manifestations**   diagnostic        detection**       governance
+                                      tools**                             response**
+  ---------------- ------------------ ----------------- ----------------- -----------------
+  Coverage or      Missing years,     Completeness      **Limited**.      Follow up with
+  completeness     delayed reporting, checks, source    Anomaly detection the source,
+  issues           partial reporting, monitoring,       may identify gaps document the gap,
+                   discontinuities    metadata review,  or abrupt         and distinguish
+                   caused by          comparison with   absences, but it  missing data from
+                   non-reporting      expected          cannot determine  true zeros or
+                                      reporting         why data are      discontinued
+                                      calendars         missing.          series.
+
+  Methodological   Rebasing,          Metadata review,  **Indirect**.     Annotate the
+  changes          redefinitions,     revision          Anomaly detection series, apply
+                   changes in         analysis, break   may flag a        revision and
+                   classification,    analysis,         structural break  versioning
+                   scope, units, or   consultation with or level shift,   policies, and
+                   source methodology source agencies   but it cannot     document
+                                                        determine whether comparability
+                                                        the change is     limitations.
+                                                        legitimate or     
+                                                        methodological.   
+
+  Processing or    Coding mistakes,   Reproducibility   **Useful as an    Correct the error
+  transformation   unit conversion    checks, code      alert**. Anomaly  through the
+  errors           errors,            review, pipeline  detection can     governed
+                   aggregation        validation,       help surface      production
+                   mistakes,          input-output      suspicious values process, document
+                   duplicate records, consistency       produced by the   the fix, and
+                   incorrect seasonal checks            pipeline, but     strengthen
+                   adjustment or                        root-cause        preventive
+                   deflation                            diagnosis         controls.
+                                                        requires process  
+                                                        controls.         
+
+  Unexpected       Extreme values,    Statistical       **Primary**. This Submit flagged
+  statistical      sudden jumps,      diagnostics,      is the setting in cases for expert
+  behavior         unusual            algorithmic       which anomaly     review, then
+                   volatility,        anomaly           detection plays   retain, annotate,
+                   out-of-pattern     detection,        its central role  revise, or
+                   movements relative peer-series       by identifying    escalate
+                   to historical      comparison,       observations or   depending on the
+                   behavior           residual analysis segments that     findings.
+                                                        deviate from      
+                                                        expected          
+                                                        patterns.         
+
+  Real economic or Crises, conflicts, Contextual        **Supportive but  Retain the values
+  social shocks    disasters, policy  analysis,         not decisive.**   if validated, and
+                   changes, commodity external          Anomaly detection document the
+                   shocks, pandemics  validation, event may flag the      event and its
+                                      timelines, domain event, but it     implications for
+                                      expertise         cannot determine  interpretation.
+                                                        whether the       
+                                                        observation is    
+                                                        valid or          
+                                                        substantively     
+                                                        meaningful.       
+  -----------------------------------------------------------------------------------------
+

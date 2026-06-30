@@ -1,0 +1,559 @@
+# Anomaly Detection Methods 
+
+This section describes the statistical and machine learning methods
+included in macroanomaly. Each method was selected for its suitability
+to the characteristics of social and economic time series: short series
+with limited observations, potential gaps from missing values, and the
+presence of trends or seasonal patterns. The methods vary in their
+underlying assumptions and sensitivity to different types of anomalies;
+using them in combination, as the package is designed to facilitate,
+produces more robust results than relying on any single approach. The
+following subsections explain how each method works and what kinds of
+anomalies it is best equipped to detect.
+
+## Z-score
+
+The Z-score is a straightforward and widely used method for detecting
+univariate point anomalies. It works by standardizing each observation
+relative to the series\' mean and standard deviation, producing a
+measure of how far that observation departs from the average. The
+formula is:
+
+$$z = \frac{(x - \mu)}{\sigma}$$
+
+where *x* is the observed value, *μ* is the series mean, and *σ* is the
+standard deviation. The resulting score expresses the distance of each
+observation from the mean in units of standard deviations. A positive
+Z-score indicates a value above the mean; a negative Z-score indicates a
+value below it.
+
+The method assumes that the values in the series --- or in a relevant
+segment of it --- are approximately normally distributed. Under this
+assumption, observations whose absolute Z-score exceeds a predefined
+threshold are flagged as anomalies. The choice of threshold directly
+controls the method\'s sensitivity: a lower threshold flags more
+observations but risks more false positives, while a higher threshold
+flags only the most extreme deviations.
+
+Three threshold values are commonly used, grounded in the properties of
+the normal distribution:
+
+- **3 (strict)**: Flags only the most extreme outliers. Under a normal
+  distribution, approximately 99.7% of observations fall within three
+  standard deviations of the mean, so only very rare values are flagged.
+
+- **2.5 (moderate)**: A widely used intermediate setting that balances
+  sensitivity and specificity.
+
+- **2 (sensitive)**: Flags a broader set of potential anomalies, since
+  approximately 95% of observations in a normal distribution fall within
+  two standard deviations.
+
+In practice, macroanomaly computes a Z-score for each observation and
+ranks them by their absolute value, allowing users to identify and
+prioritize the most significant deviations.
+
+Detection thresholds should be calibrated, not treated as fixed
+defaults. Calibration should consider at least three factors: the type
+of indicator, the length and comparability of the series, and the team's
+review capacity. Lower thresholds increase sensitivity but also increase
+the number of false positives and the burden of manual review. Higher
+thresholds reduce review burden but increase the risk of missing
+substantive problems. Users should begin with a documented default, test
+how many observations are flagged under alternative settings, and choose
+a threshold that produces a manageable review workload while still
+surfacing meaningful cases. For short or fragmented series, automated
+flags should be treated primarily as a prioritization tool for manual
+review rather than as strong evidence on their own.
+
+**A robust alternative: the modified Z-score**
+
+A well-known limitation of the classical Z-score is that both the mean
+and standard deviation are sensitive to extreme values --- precisely the
+values the method is trying to detect. A single outlier can inflate the
+standard deviation and shift the mean toward it, making other anomalies
+harder to identify.
+
+The modified Z-score addresses this by replacing the mean with the
+median and the standard deviation with the Median Absolute Deviation
+(MAD). The MAD is defined as:
+
+$$\text{MAD} = \text{median}(\left| x_{i} - \text{median}(x) \right|)$$
+
+The modified Z-score is then computed as:
+
+$$\text{Robust}\ z \approx 0.6745 \times (x_{i} - \text{median}(x))/\text{MAD}$$
+
+The constant 0.6745 is a scaling factor that makes the MAD comparable to
+the standard deviation for normally distributed data, so that modified
+Z-scores remain interpretable on the same scale as classical ones.
+Because the median and MAD are resistant to the influence of extreme
+values, the modified Z-score provides a more reliable measure of
+deviation in datasets that already contain outliers.
+
+**Implementation of Z-score in macroanomaly**
+
+macroanomaly implements the z-score method internally when applying the
+normalize() function.
+
+*Parameter:*
+
+- **Threshold**: the absolute Z-score above which an observation is
+  flagged as an anomaly. The default value is 3, but users can adjust
+  this based on the series characteristics or the desired level of
+  sensitivity.
+
+*Output fields:*
+
+- **Flag**: a binary indicator marking whether the observation is
+  flagged as an anomaly.
+
+- **zscore** and **abs_zscore**: the signed and absolute Z-score for
+  each observation. A higher absolute value indicates a greater
+  deviation from expectations; the sign indicates the direction
+  (positive means higher than expected, negative means lower).
+
+**Limitations**
+
+Both the classical and modified Z-score methods perform best on
+stationary series that are approximately normally distributed. If a
+series exhibits a clear trend or seasonal pattern, it should be
+transformed to stationarity before these methods are applied --- a step
+that macroanomaly handles automatically in its data preparation stage.
+Additionally, both methods become less reliable on very short series,
+where estimates of central tendency and dispersion (whether mean and
+standard deviation, or median and MAD) are inherently noisy.
+
+## Collective and Point Anomalies (CAPA)
+
+CAPA is a univariate method capable of detecting both point and
+collective anomalies within the same framework --- a distinctive feature
+that sets it apart from methods designed for only one type. The
+algorithm approaches detection as an optimization problem: it searches
+over all possible configurations of anomalous segments and isolated
+points, selecting the combination that best improves the fit to the data
+relative to the cost of introducing additional anomalies. This is
+achieved through penalized likelihood optimization, solved efficiently
+using dynamic programming with pruning, which gives the method
+near-linear computational performance even on long series.
+
+By default, macroanomaly applies robust standardization --- using the
+median and MAD rather than the mean and standard deviation --- when
+estimating baseline behavior. This reduces the influence of extreme
+values on the reference distribution, making the method more reliable in
+series that already contain anomalies.
+
+**Implementation in macroanomaly**
+
+macroanomaly implements the capa method from the anomaly package.
+
+*Parameters:*
+
+- **Minimum segment length**: the shortest sequence of consecutive
+  observations that can be classified as a collective anomaly. The
+  default value is 2, meaning at least two consecutive observations must
+  be involved for a segment to be flagged as collective.
+
+- **Anomaly type**: the type of change that CAPA is configured to
+  detect. The default is \"meanvar\", which flags collective anomalies
+  characterized by simultaneous shifts in both the mean and variance of
+  the series. Alternative options are \"mean\", which detects shifts in
+  the mean only, and \"robustmean\", which focuses on mean shifts while
+  explicitly accounting for the presence of point outliers in the
+  series.
+
+*Output fields:*
+
+- **Flag**: a binary indicator marking whether an observation has been
+  flagged as an anomaly, either as a point anomaly or as part of a
+  collective anomaly segment.
+
+- **capa_strength**: the magnitude of the anomaly, expressed as the
+  absolute deviation from the local robust mean in Z-score units. This
+  field is populated only for flagged point anomalies; it is NA for
+  non-anomalous observations and for observations that are part of a
+  collective segment but do not independently qualify as point
+  anomalies.
+
+**Limitations**
+
+CAPA operates on a single series at a time and is therefore a univariate
+method. Like the Z-score methods, it performs best on stationary series;
+macroanomaly handles the necessary preprocessing automatically. The
+choice of penalty parameters and minimum segment length can influence
+results meaningfully, particularly on short series, and users are
+encouraged to review outputs across a range of settings when working
+with unusual or sparse data.
+
+## Time Series Outlier (TSOutlier)
+
+TSOutlier is a univariate method for detecting point anomalies based on
+the interquartile range (IQR). Rather than applying the IQR to raw
+values, the method first decomposes the series into its trend, seasonal,
+and remainder components, then applies outlier detection to the
+remainder alone. This ensures that observations are assessed relative to
+the local behavior of the series, stripped of systematic patterns that
+would otherwise obscure genuine anomalies. The implementation follows
+the approach provided in the forecast R package.
+
+The detection logic proceeds as follows. For a given window of
+observations (or the full series), the first and third quartiles --- Q1
+and Q3 --- are computed, and the interquartile range is defined as IQR =
+Q3 − Q1. Lower and upper bounds are then set at Q1 − k × IQR and Q3 + k
+× IQR respectively. Any observation falling outside these bounds is
+flagged as an anomaly.
+
+A key advantage of this approach is that the IQR is inherently robust:
+unlike the mean and standard deviation, quartiles are not distorted by
+the extreme values they are meant to detect. The method is also
+nonparametric, requiring no assumptions about the underlying
+distribution of the data.
+
+**Implementation in macroanomaly**
+
+macroanomaly implements the tsoutlier algorithm from the forecast
+package natively.
+
+*Parameters:*
+
+- **Multiplier k (**.threshold**)**: determines how far an observation
+  must fall from the interquartile range to be flagged. A value of 1.5
+  is conventional for detecting mild outliers; a value of 3.0 flags only
+  more extreme deviations. The default in macroanomaly is 3.0.
+
+*Output fields:*
+
+- **Flag**: a binary indicator marking whether the observation has been
+  flagged as an anomaly.
+
+**Limitations**
+
+The sensitivity of TSOutlier depends heavily on the choice of window
+length and multiplier k, and users should consider adjusting these
+parameters when working with series of unusual length or volatility.
+Because the method operates on the remainder after trend and seasonal
+decomposition --- a step handled automatically by macroanomaly --- it is
+less prone to false positives than applying IQR-based detection directly
+to raw values. However, in very short series, decomposition may be
+unreliable, and results should be interpreted with caution.
+
+## Hampel Filter 
+
+The Hampel filter is a univariate method for detecting point anomalies
+using a sliding window approach. For each observation in the series, it
+computes a robust Z-score based on the local median and MAD within a
+surrounding window, then flags observations whose deviation from the
+local center exceeds a defined threshold. More formally, for each time
+point *t*:
+
+1.  A window of neighboring observations centered on *x_t* is selected.
+
+2.  The window median m_t and the median absolute deviation MAD_t =
+    median(\|x_i − m_t\|) are computed.
+
+3.  A robust Z-score is calculated as *z_t = \|x_t − m_t\|* / (1.4826 ×
+    MAD_t), where the constant 1.4826 makes the MAD comparable to the
+    standard deviation under a normal distribution.
+
+4.  The observation is flagged as an anomaly if *z_t* exceeds a
+    threshold *t0*, commonly set to 3.
+
+Because detection relies on the median and MAD rather than the mean and
+standard deviation, the method is inherently robust: extreme values in
+the window have little influence on the reference statistics used to
+assess them. The sliding window design also makes detection local,
+allowing the method to adapt to series where the typical level or
+variability changes over time.
+
+**Controlling false positives**
+
+A limitation of the standard Hampel filter is its tendency to produce
+false positives, particularly in series with moderate variability. As
+shown in Figure 1, where red dots mark flagged anomalies, values that
+deviate only slightly from the trend, such as the 1990 observation, may
+be incorrectly flagged.
+
+![- False positives produced by the standard Hampel
+filter](../images/media/image3.jpg){width="6.502047244094488in"
+height="3.707416885389326in"}
+
+![- Result after applying the secondary
+filter](../images/media/image4.jpg){width="6.5735586176727905in"
+height="3.748193350831146in"}
+
+**Implementation in macroanomaly**
+
+macroanomaly implements (and adapts) the hampel method from the pracma
+package.
+
+*Parameters:*
+
+- **Half-window size**: the number of observations on each side of *x_t*
+  included in the local window. A larger window captures broader context
+  but may dilute local sensitivity; a smaller window is more responsive
+  to sharp local changes. The default is 5.
+
+- **Threshold *t0***: the robust Z-score above which an observation is
+  flagged. Higher values reduce sensitivity and false positives; lower
+  values flag more observations. The default is 5, reflecting a
+  conservative setting appropriate for most development data series.
+
+- **Secondary filter**: an on/off toggle enabling the false-positive
+  reduction step described above. Off by default.
+
+- **Secondary filter bandwidth**: the number of standard deviations from
+  the trimmed mean within which flagged observations are unflagged. Only
+  applies when the secondary filter is enabled. The default is 1.
+
+- **Input column**: determines whether the filter is applied to the raw
+  series values or to the Z-score column. Defaults to the Z-score
+  column, consistent with macroanomaly\'s standardized preprocessing
+  pipeline.
+
+*Output fields:*
+
+- **outlier_indicator**: a binary 0/1 flag indicating whether the
+  observation has been identified as an anomaly.
+
+- **hampel_replacements**: a corrected version of the series in which
+  flagged observations are replaced by the local window median. This can
+  be used as a cleaned series for downstream analysis, though users
+  should exercise judgment before treating replacements as authoritative
+  corrections.
+
+**Limitations**
+
+The Hampel filter\'s performance depends on the choice of window size
+and threshold. A window that is too narrow may miss anomalies embedded
+in locally volatile segments; one that is too wide may smooth over
+genuine deviations. Like the other methods in this document, the filter
+performs best on stationary series --- macroanomaly applies trend and
+seasonal adjustment in its preprocessing stage before this method is
+run. On very short series, local window estimates may be unstable, and
+results should be interpreted accordingly.
+
+## Outlier Trees
+
+Outlier Trees is a multivariate method for detecting point anomalies.
+Unlike the univariate methods described in previous sections, it
+assesses each observation in the context of multiple variables
+simultaneously, making it capable of identifying anomalies that arise
+from unusual combinations of values rather than extreme values in any
+single series.
+
+The method works by building a decision-tree-like structure whose
+objective is not prediction but the identification of rarity. At each
+node, the algorithm selects splits that isolate small, low-density
+regions of the feature space --- subsets of observations that are
+unusually sparse given the values of the features used to define them.
+The leaves of the tree correspond to narrow, well-defined segments
+containing very few observations. An observation falling into such a
+leaf is flagged as an outlier, and the path of splits leading to that
+leaf constitutes a human-readable rule explaining why.
+
+Internally, the method uses robust statistics --- such as median- and
+quantile-based thresholds --- to identify rare ranges for numeric
+features, reducing sensitivity to the very extremes it is designed to
+detect. Each observation receives a score reflecting the rarity and
+strength of the rule it satisfies; higher scores indicate stronger
+anomalies. A notable advantage of this approach is interpretability:
+unlike many anomaly detection algorithms, Outlier Trees can explain each
+flagged observation in terms of concrete, auditable conditions on the
+input features.
+
+The method is well-suited to high-dimensional data and imposes no strong
+distributional assumptions. However, its performance depends on the
+quality and relevance of the input features: strongly correlated or
+highly noisy features can distort the splitting process. The method may
+also flag only a small number of anomalies in datasets with moderate
+variability, and tuning of key parameters is often necessary to achieve
+appropriate sensitivity.
+
+**Implementation in macroanomaly**
+
+macroanomaly implements the outliertree algorithm from the outliertree
+package.
+
+*Parameters:*
+
+- **Columns used for detection**: the subset of features passed to the
+  algorithm. Defaults to all available columns in the dataset.
+
+- **Input column**: determines whether the method is applied to the raw
+  series values or to the Z-score column. Defaults to the Z-score
+  column, consistent with macroanomaly\'s standardized preprocessing
+  pipeline.
+
+- **Score threshold**: the minimum score above which an observation is
+  flagged as an anomaly. Scores range from 0 to 1, with higher values
+  indicating greater anomalousness. The default threshold is 0.5.
+
+- **Threads**: the number of CPU threads used for parallel computation.
+  The default is 2.
+
+- Additional arguments: using \... the user can pass additional
+  arguments to the outliertree function, if needed.
+
+*Output fields:*
+
+- **outlier_score**: a continuous score between 0 and 1 produced by the
+  algorithm, where higher values indicate a greater degree of
+  anomalousness. This field can be used to rank observations by severity
+  rather than applying a binary cutoff.
+
+- **outlier_indicator**: a binary 0/1 flag derived by applying the score
+  threshold to outlier_score. Observations with a score above the
+  threshold (default 0.5) are flagged as anomalies.
+
+**Limitations**
+
+Outlier Trees is a multivariate method, and its results are shaped by
+which variables are included in the analysis. Including irrelevant or
+redundant features can degrade performance, so users should give some
+thought to feature selection before applying the method. As with the
+other methods in this document, the input series should be stationary
+--- macroanomaly applies the necessary preprocessing before this step.
+On small datasets, the tree-based approach may produce unstable results,
+and increasing the number of trees can help mitigate this.
+
+## Isolation Trees
+
+Isolation Forest (and Isolation trees) is a multivariate method for
+detecting point anomalies. Its central insight is that anomalies are, by
+nature, few and different: because they occupy sparse, atypical regions
+of the feature space, they tend to be isolated from the rest of the data
+more quickly and with fewer random partitions than normal observations.
+The algorithm exploits this property directly, using isolation speed as
+a proxy for anomalousness.
+
+The method builds an ensemble of random binary trees --- isolation trees
+--- each constructed on a random subsample of the data. Within each
+tree, a feature and a split value are chosen at random, and the data is
+partitioned recursively until each observation is isolated or a maximum
+depth is reached. The number of splits required to isolate an
+observation, averaged across all trees, forms its path length. This
+average path length is then normalized into an anomaly score:
+observations that are isolated quickly receive high scores, while those
+that require many splits --- sitting in denser, more typical regions ---
+receive lower ones.
+
+The method scales efficiently to large, high-dimensional datasets and
+operates without distributional assumptions. However, like Outlier
+Trees, it may flag only a small number of anomalies in datasets with
+moderate variability, and results can be sensitive to the choice of
+threshold and tree configuration.
+
+**Implementation in macroanomaly**
+
+macroanomaly implements the isolation.forest algorithm from the isotree
+package.
+
+*Core parameters:*
+
+- **Number of dimensions per split**: controls whether splits are made
+  on a single variable at a time (1, the default) or on linear
+  combinations of multiple variables (higher values). Higher values
+  enable the algorithm to capture multivariate patterns that no single
+  variable would reveal.
+
+- **Number of trees**: the size of the tree ensemble. The default is 10,
+  which is intentionally conservative; increasing this value improves
+  the stability of anomaly scores at the cost of additional computation
+  time.
+
+- **Subsample fraction**: the proportion of the dataset used to build
+  each tree. The default is 1 (the full dataset); values below 1 reduce
+  computation time but may reduce accuracy.
+
+- **Score threshold**: the minimum anomaly score above which an
+  observation is flagged. Scores range from 0 to 1, with higher values
+  indicating greater anomalousness. The default is 0.5.
+
+- **Threads**: the number of CPU threads used for parallel computation.
+  The default is 2.
+
+- **Additional arguments**: using \... the user can pass additional
+  arguments to the isolation.forest function, if needed (see Advanced
+  parameters subsection).
+
+*Advanced parameters:*
+
+The following parameters are passed directly to the underlying algorithm
+and allow finer control over the tree construction and flagging logic.
+Default values are appropriate for most use cases, but users working
+with unusual data structures may wish to adjust them.
+
+- **max_depth**: the maximum depth of each isolation tree. The default
+  is 4. Setting this to 0 causes each feature to be assessed
+  independently, without conditioning on other variables.
+
+- **min_gain**: the minimum improvement required for a split to be
+  accepted, expressed as a proportion of the standard deviation or
+  entropy. The default is 0.01.
+
+- **z_norm**: the maximum Z-score still considered consistent with
+  normal behavior. The default is 2.67. This parameter does not assume
+  normality --- it simply defines the boundary between typical and
+  unusual observations within a branch.
+
+- **z_outlier**: the minimum Z-score required for an observation to be
+  flagged as an outlier. The default is 8. The gap between z_outlier and
+  z_norm controls how extreme a deviation must be relative to its local
+  branch before it is flagged; reducing this gap increases the number of
+  observations flagged.
+
+- **pct_outliers**: the approximate maximum expected proportion of
+  outliers per branch. The default is 0.01 (1%).
+
+- **min_size_numeric**: the minimum number of observations required in a
+  branch before outlier evaluation is performed on a numeric column. The
+  default is 25; a branch must contain at least twice this number for a
+  split to be evaluated.
+
+- **min_size_categ**: the equivalent minimum branch size for categorical
+  or ordinal columns. The default is 50.
+
+- **categ_split**: the strategy used to split categorical variables.
+  Options are \"binarize\" (default), \"bruteforce\", and \"separate\".
+
+- **categ_outliers**: the strategy used to detect outliers in
+  categorical columns. \"tail\" (default) is more sensitive;
+  \"majority\" is stricter and better suited to large samples.
+
+- **numeric_split**: how split points are defined for numeric variables.
+  \"raw\" (default) uses the actual observed value; \"mid\" uses the
+  midpoint between branches, which may be preferable for continuous
+  data.
+
+- **cols_ignore**: a vector of column names to exclude from splitting
+  decisions. Excluded columns are still used as split targets but will
+  not themselves drive partitioning.
+
+- **follow_all**: whether to continue branching from every valid split.
+  The default is FALSE. Setting this to TRUE can produce an
+  exponentially large number of branches and a correspondingly large
+  number of spurious detections; this setting is not recommended for
+  routine use.
+
+*Output fields:*
+
+- **outlier_score**: a continuous value indicating the \"outlierness\",
+  according to the documentation of the isotree package. Values close to
+  1 are highly anomalous, while values close to 0.5 are \"average
+  isolation depth\".
+
+- **outlier_indicator**: a binary 0/1 flag derived by applying the score
+  threshold to outlier_score. The default threshold is 0.5.
+
+**Limitations**
+
+Isolation Forest is a multivariate method, and the choice of which
+features to include meaningfully affects its results. Noisy or
+irrelevant features can obscure genuine anomalies by diluting the signal
+in the partitioning process. The large number of available parameters
+gives the method considerable flexibility, but also means that results
+on small or unusual datasets may require careful tuning. As with all
+methods in this document, macroanomaly applies trend and seasonal
+adjustment before this step, ensuring that the algorithm operates on
+stationary input.
+
